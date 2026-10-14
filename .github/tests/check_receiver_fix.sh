@@ -8,7 +8,7 @@
 set -euo pipefail
 
 build_dir="${1:?usage: $0 <esphome build directory>}"
-isr_read="esphome::libretiny::ISRInternalGPIOPin::digital_read()"
+isr_read="esphome::ISRInternalGPIOPin::digital_read()"
 
 # Messages also show up as annotations when running in GitHub Actions.
 fail() {
