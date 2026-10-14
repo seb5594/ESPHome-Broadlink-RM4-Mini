@@ -12,6 +12,10 @@ platform. Everything that builds on that platform can use it right away, for
 example [HAIR](https://github.com/DAB-LABS/HAIR) or the LG and Samsung
 infrared integrations.
 
+This project stands on the groundwork of
+[phdindota/broadlink-rm4mini-esphome](https://github.com/phdindota/broadlink-rm4mini-esphome),
+the first ESPHome port for the RM4 Mini. Thank you, see [Thanks](#thanks).
+
 - [Features](#features)
 - [Requirements](#requirements)
 - [Supported hardware](#supported-hardware)
@@ -22,13 +26,15 @@ infrared integrations.
 - [Using it with HAIR](#using-it-with-hair)
 - [Troubleshooting](#troubleshooting)
 - [Known limitations](#known-limitations)
-- [Credits](#credits)
+- [Thanks](#thanks)
 
 ## Features
 
 - Send IR codes with ESPHome's own `remote_transmitter` (hardware PWM
   carrier, non-blocking, so Wi-Fi keeps running while long codes go out)
-- Receive IR codes from any remote with `remote_receiver`
+- Receive IR codes from any remote with `remote_receiver`, including a small
+  fix that makes interrupt-driven pins work on this chip
+  ([details](#the-receiver-fix))
 - Both exposed to Home Assistant as native infrared entities through
   `ir_rf_proxy`, no custom code or lambdas
 - Status LED and the physical button
@@ -220,6 +226,7 @@ The configuration is split in two parts:
 | File | Purpose |
 |---|---|
 | [`broadlink-rm4-mini.yaml`](broadlink-rm4-mini.yaml) | Everything that belongs to the hardware. Used as a package and never edited by you. |
+| [`src/rtl8720c_irq_read.c`](src/rtl8720c_irq_read.c) | The receiver fix, pulled in by the package. See [The receiver fix](#the-receiver-fix). |
 | [`example.yaml`](example.yaml) | Your device: name, Wi-Fi, API key, hotspot password. Pulls in the package straight from GitHub. |
 
 That keeps your own file at a few lines, and fixes in this repository reach
@@ -252,12 +259,46 @@ esphome:
   project:
     name: seb5594.broadlink-rm4-mini
     version: "1.0.0"
+  build_flags:
+    - -Wl,--wrap=digitalRead
+  includes:
+    - src/rtl8720c_irq_read.c
 ```
 
 `min_version` stops the build on ESPHome releases older than 2026.9.0, the
 ones whose transmitter crashes this chip. `project` shows up in the device
 info in Home Assistant, so you can see which version of this config runs on
-the device.
+the device. `build_flags` and `includes` add the receiver fix described in the
+next section. The path is resolved next to the package file, so this also works
+when the package comes straight from GitHub.
+
+#### The receiver fix
+
+Without help, the IR receiver on the RTL8720C stays silent. ESPHome's
+`remote_receiver` attaches an interrupt to the receiver pin and reads the pin
+level inside that interrupt with `digitalRead()`. LibreTiny, however, removes
+the plain GPIO mode of a pin as soon as an interrupt is attached, because the
+RTL8720C can't use both at once. The next `digitalRead()` call sets the pin up
+as a GPIO input again and frees the interrupt on the way, so the receiver sees
+the first edge of a code and then nothing at all.
+
+[`src/rtl8720c_irq_read.c`](src/rtl8720c_irq_read.c) fixes that without
+touching LibreTiny:
+
+- The linker option `-Wl,--wrap=digitalRead` sends every `digitalRead()` call
+  of the firmware to `__wrap_digitalRead()` from that file.
+- For a pin with an active interrupt, the wrapper reads the level through the
+  interrupt object (`gpio_irq_read()`), which leaves the interrupt alone.
+- Every other pin, like the button, goes to LibreTiny's original
+  `digitalRead()` unchanged.
+
+The idea comes from phdindota, who found the cause and fixed it with a patch
+script for LibreTiny's source. That script edits the LibreTiny copy in the
+shared PlatformIO folder, so it affects every LibreTiny build on the machine
+and needs an absolute path in the ESPHome dashboard. The linker wrap keeps the
+fix inside this firmware and works from a GitHub package. The CI of this
+repository compiles the firmware and checks in the binary that the receiver
+path really calls the wrapper.
 
 #### `rtl87xx`
 
@@ -534,12 +575,10 @@ Same cause: firmware built with an ESPHome release before 2026.9.0. Rebuild
 with a current version.
 
 **Nothing arrives at the receiver**
-Set `level: DEBUG` in `logger` and uncomment `dump: raw`, then watch the log
-while pressing buttons from about one metre away. If the log stays silent,
-compare with phdindota's
-[`patch_libretiny.py`](https://github.com/phdindota/broadlink-rm4mini-esphome/blob/main/patch_libretiny.py),
-which patches LibreTiny's `digitalRead()` for interrupt-driven pins, and open
-an issue here.
+Make sure your config still pulls in the whole package, the
+[receiver fix](#the-receiver-fix) comes with it. Then set `level: DEBUG` in
+`logger` and uncomment `dump: raw`, and watch the log while pressing buttons
+from about one metre away. If it stays silent, open an issue with the log.
 
 **Air conditioner codes arrive in pieces**
 Raise `ir_receiver_idle` to `80ms`.
@@ -557,15 +596,22 @@ Wi-Fi credentials in your secrets; only 2.4 GHz networks work.
 - The RM4 Mini has no RF hardware. For 433 MHz look at the RM4 Pro.
 - Hardware UART logging stays off, see [`logger`](#logger).
 
-## Credits
+## Thanks
 
-- [phdindota/broadlink-rm4mini-esphome](https://github.com/phdindota/broadlink-rm4mini-esphome)
-  found the pin map, documented opening and flashing the RM4 Mini and took the
-  photo of the board used above (MIT).
-- [LibreTiny](https://github.com/libretiny-eu/libretiny) brings ESPHome to the
-  RTL8720CF, [ESPHome](https://esphome.io/) did the RTL8720C transmitter work
-  and the IR proxy.
-- [HAIR](https://github.com/DAB-LABS/HAIR) by DAB-LABS.
+A big thank you to **phdindota** and
+[phdindota/broadlink-rm4mini-esphome](https://github.com/phdindota/broadlink-rm4mini-esphome).
+Without that project this one wouldn't exist: it was the first to put ESPHome
+on the RM4 Mini, worked out the pin map from the stock firmware, documented how
+to open and flash the device, found the cause of the silent IR receiver and
+provided the photo of the board used above (MIT licensed).
+
+Thanks as well to
+
+- [LibreTiny](https://github.com/libretiny-eu/libretiny) for bringing ESPHome
+  to the RTL8720CF,
+- [ESPHome](https://esphome.io/) for the RTL8720C transmitter work and the IR
+  proxy,
+- [DAB-LABS](https://github.com/DAB-LABS) for [HAIR](https://github.com/DAB-LABS/HAIR).
 
 ## License
 
