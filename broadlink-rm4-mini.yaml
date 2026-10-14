@@ -25,6 +25,13 @@ esphome:
   project:
     name: seb5594.broadlink-rm4-mini
     version: "1.0.0"
+  # Lets the IR receiver read its pin from the interrupt handler. Without it
+  # LibreTiny drops the interrupt on the first edge and nothing is received.
+  # Details in src/rtl8720c_irq_read.c.
+  build_flags:
+    - -Wl,--wrap=digitalRead
+  includes:
+    - src/rtl8720c_irq_read.c
 
 rtl87xx:
   board: generic-rtl8720cf-2mb-992k

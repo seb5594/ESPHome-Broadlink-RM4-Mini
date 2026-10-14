@@ -1,12 +1,12 @@
-# Used by the CI workflow to validate the package from the current branch.
-# Not meant for flashing.
+# Used by the CI workflow to validate and build the package from the current
+# branch. Not meant for flashing.
 
 substitutions:
   name: ci-broadlink-rm4-mini
   friendly_name: CI Broadlink RM4 Mini
 
 packages:
-  broadlink_rm4_mini: !include ../broadlink-rm4-mini.yaml
+  broadlink_rm4_mini: !include ../../broadlink-rm4-mini.yaml
 
 wifi:
   ssid: ci-network
