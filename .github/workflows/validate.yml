@@ -20,7 +20,7 @@ jobs:
       - run: pip install yamllint
       - run: yamllint --strict .
 
-  esphome-config:
+  esphome:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -32,6 +32,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-${{ matrix.esphome }}-${{ hashFiles('broadlink-rm4-mini.yaml') }}
+          restore-keys: platformio-${{ matrix.esphome }}-
       - name: Install ESPHome ${{ matrix.esphome }}
         run: |
           if [ "${{ matrix.esphome }}" = "latest" ]; then
@@ -41,6 +47,10 @@ jobs:
           fi
       - name: Create throwaway secrets
         run: |
-          echo "api_encryption_key: \"$(openssl rand -base64 32)\"" > tests/secrets.yaml
-      - name: Validate package from this branch
-        run: esphome config tests/ci.yaml
+          echo "api_encryption_key: \"$(openssl rand -base64 32)\"" > .github/tests/secrets.yaml
+      - name: Validate config
+        run: esphome config .github/tests/ci.yaml
+      - name: Compile firmware
+        run: esphome compile .github/tests/ci.yaml
+      - name: Check IR receiver fix
+        run: bash .github/tests/check_receiver_fix.sh .github/tests/.esphome/build
