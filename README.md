@@ -26,6 +26,7 @@ the first ESPHome port for the RM4 Mini. Thank you, see [Thanks](#thanks).
 - [Using it with HAIR](#using-it-with-hair)
 - [Troubleshooting](#troubleshooting)
 - [Known limitations](#known-limitations)
+- [Changelog](CHANGELOG.md)
 - [Thanks](#thanks)
 
 ## Features
