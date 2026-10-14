@@ -1,0 +1,46 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  yamllint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install yamllint
+      - run: yamllint --strict .
+
+  esphome-config:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Oldest supported release and whatever is current.
+        esphome: ["2026.9.0", "latest"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install ESPHome ${{ matrix.esphome }}
+        run: |
+          if [ "${{ matrix.esphome }}" = "latest" ]; then
+            pip install esphome
+          else
+            pip install "esphome==${{ matrix.esphome }}"
+          fi
+      - name: Create throwaway secrets
+        run: |
+          echo "api_encryption_key: \"$(openssl rand -base64 32)\"" > tests/secrets.yaml
+      - name: Validate package from this branch
+        run: esphome config tests/ci.yaml

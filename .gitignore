@@ -1,0 +1,9 @@
+# ESPHome build output and local secrets
+.esphome/
+secrets.yaml
+
+# Firmware images and stock backups
+*.bin
+*.uf2
+
+.DS_Store

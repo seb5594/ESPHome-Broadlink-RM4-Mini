@@ -1,0 +1,101 @@
+# Broadlink RM4 Mini / RM4C Mini as a native Home Assistant IR proxy
+#
+# Hardware:  board RM4_MINI-MAIN-V4.0.1, Wi-Fi module BL3357-P (Realtek RTL8720CF)
+# Project:   https://github.com/seb5594/ESPHome-Broadlink-RM4-Mini
+#
+# This file holds everything that belongs to the hardware. Your own device
+# config pulls it in as a package and only adds Wi-Fi credentials and keys,
+# see example.yaml. Every value under `substitutions` can be overridden there.
+#
+# Requires ESPHome 2026.9.0 or newer: older releases crashed the RTL8720C
+# inside remote_transmitter, which is why earlier projects shipped a custom
+# ir_tx.h. That workaround is no longer needed.
+
+substitutions:
+  name: broadlink-rm4-mini
+  friendly_name: Broadlink RM4 Mini
+  # Silence that ends a received code. 25 ms suits TV and audio remotes;
+  # raise it (e.g. to 80ms) if long air conditioner codes arrive split up.
+  ir_receiver_idle: 25ms
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.9.0
+  project:
+    name: seb5594.broadlink-rm4-mini
+    version: "1.0.0"
+
+rtl87xx:
+  board: generic-rtl8720cf-2mb-992k
+  family: rtl8720c
+  framework:
+    version: latest
+
+logger:
+  # INFO keeps the small CPU quiet. Use DEBUG together with `dump: raw`
+  # below when you want to see received codes.
+  level: INFO
+  # The hardware UART stays off, it interferes with the IR receiver
+  # interrupts on this chip. Logs still work over Wi-Fi.
+  baud_rate: 0
+
+api:
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+wifi:
+  # Credentials come from your own config (see example.yaml). Without a
+  # connection the device opens a fallback hotspot named after the device.
+  ap:
+
+# Web page on the fallback hotspot to enter new Wi-Fi credentials, so a
+# changed password never means opening the case again.
+captive_portal:
+
+status_led:
+  pin:
+    number: PA7
+    inverted: true
+
+binary_sensor:
+  - platform: gpio
+    id: button
+    name: Button
+    pin:
+      number: PA19
+      inverted: true
+      mode: INPUT_PULLUP
+
+remote_receiver:
+  id: ir_rx
+  pin:
+    number: PA18
+  # Ignores short flashes of ambient light (sun, some lamps) that are no IR code.
+  filter: 200us
+  idle: ${ir_receiver_idle}
+  # buffer_size is left at ESPHome's default on purpose (room for 1000 pulses),
+  # see the README for the details.
+  # dump: raw  # uncomment to see received codes in the log
+
+remote_transmitter:
+  id: ir_tx
+  pin: PA4
+  carrier_duty_percent: 50%
+  # Sends from a hardware timer, so Wi-Fi and the API keep running
+  # while long codes (e.g. air conditioners) are being transmitted.
+  non_blocking: true
+
+infrared:
+  - platform: ir_rf_proxy
+    id: ir_proxy_tx
+    name: IR Emitter
+    remote_transmitter_id: ir_tx
+
+  - platform: ir_rf_proxy
+    id: ir_proxy_rx
+    name: IR Receiver
+    remote_receiver_id: ir_rx
+    receiver_frequency: 38kHz
