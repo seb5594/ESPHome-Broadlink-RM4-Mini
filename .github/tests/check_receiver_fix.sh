@@ -10,30 +10,40 @@ set -euo pipefail
 build_dir="${1:?usage: $0 <esphome build directory>}"
 isr_read="esphome::libretiny::ISRInternalGPIOPin::digital_read()"
 
-nm_tool=$(find "$HOME/.platformio/packages" -type f -name 'arm-none-eabi-nm' -print -quit)
-if [[ -z "$nm_tool" ]]; then
-  echo "arm-none-eabi-nm not found, was the firmware compiled?" >&2
+# Messages also show up as annotations when running in GitHub Actions.
+fail() {
+  echo "::error::$1"
   exit 1
-fi
+}
+
+nm_tool=$(find "$HOME/.platformio/packages" -type f -name 'arm-none-eabi-nm' -print -quit)
+[[ -n "$nm_tool" ]] || fail "arm-none-eabi-nm not found, was the firmware compiled?"
 objdump_tool="${nm_tool%nm}objdump"
 
-while IFS= read -r elf; do
-  "$nm_tool" "$elf" | grep -q ' T __wrap_digitalRead$' || continue
-  echo "Wrapper found in $elf"
+mapfile -t elf_files < <(find "$build_dir" -name '*.elf')
+[[ ${#elf_files[@]} -gt 0 ]] || fail "No ELF file found below $build_dir"
 
-  isr_body=$("$objdump_tool" -d -C "$elf" | awk -v name="<$isr_read>:" 'index($0, name) {found = 1} found && /^$/ {exit} found')
-  if [[ -z "$isr_body" ]]; then
-    echo "$isr_read not found in $elf" >&2
-    exit 1
-  fi
-  if grep -q '__wrap_digitalRead' <<< "$isr_body"; then
-    echo "$isr_read calls __wrap_digitalRead: receiver fix is active"
+work_dir=$(mktemp -d)
+trap 'rm -rf "$work_dir"' EXIT
+
+for elf in "${elf_files[@]}"; do
+  # Full listings go to files first: grep -q stops reading early, which
+  # would make the producing tool fail under pipefail.
+  "$nm_tool" "$elf" > "$work_dir/symbols"
+  grep -q ' T __wrap_digitalRead$' "$work_dir/symbols" || continue
+  echo "Wrapper linked into $elf"
+
+  "$objdump_tool" -d -C "$elf" > "$work_dir/disassembly"
+  awk -v name="<$isr_read>:" 'index($0, name) {found = 1} found && /^$/ {exit} found' \
+    "$work_dir/disassembly" > "$work_dir/isr_read"
+
+  [[ -s "$work_dir/isr_read" ]] || fail "$isr_read not found in $elf"
+  if grep -q '__wrap_digitalRead' "$work_dir/isr_read"; then
+    echo "::notice::$isr_read calls __wrap_digitalRead, the receiver fix is active"
     exit 0
   fi
-  echo "$isr_read does not call __wrap_digitalRead:" >&2
-  echo "$isr_body" >&2
-  exit 1
-done < <(find "$build_dir" -name '*.elf')
+  cat "$work_dir/isr_read"
+  fail "$isr_read does not call __wrap_digitalRead"
+done
 
-echo "No firmware with __wrap_digitalRead found below $build_dir" >&2
-exit 1
+fail "__wrap_digitalRead is not linked into any of: ${elf_files[*]}"
