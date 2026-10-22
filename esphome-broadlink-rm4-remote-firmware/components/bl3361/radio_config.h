@@ -1,0 +1,260 @@
+#pragma once
+
+// Tuning of the BL3361 RF module: which frequencies exist and what the module
+// has to be told to use one of them. EXPERIMENTAL, see protocol.h.
+//
+// How it was found
+// ----------------
+// Before every receive or transmit the stock firmware sends the module one
+// "configuration blob" (command 0x600). It is built from a request of the form
+// (base frequency, step, number of channels):
+//
+//   1. A frequency in kHz is turned into such a request. Two families exist:
+//        - 315.000-315.999 MHz and 433.000-433.999 MHz are covered in 10 kHz
+//          steps: base = frequency rounded down to 100 kHz, 20 channels.
+//        - 305-339.999 MHz and 430-439.999 MHz are covered in 100 kHz steps:
+//          base = frequency rounded down to 1 MHz, 20 channels.
+//      The module then sits on channel (frequency - base) / step. 433.92 MHz
+//      becomes base 433900 kHz, step 10 kHz, channel 2.
+//   2. The blob is a small list of type/length/value records:
+//        type 1  96 register/value pairs (192 bytes) for the transceiver chip
+//        type 6  two bytes: automatic frequency control threshold, step scaled
+//        type 7  one byte, always 0x10
+//        type 8  one byte, always 0x00
+//      The register values come from a fixed template. Eight of them (0x18 to
+//      0x1F, two synthesizer words) depend on the base frequency and are taken
+//      from a table with one row per supported base frequency; above 340 MHz
+//      eleven more (0x55 to 0x5F) are replaced by a second set.
+//
+// The tables below are register settings read from the stock image, they are
+// what the module needs to be tuned and have no meaning on their own. The
+// logic around them is written from the description above, not copied.
+
+#include <cstddef>
+#include <cstdint>
+
+namespace esphome::bl3361 {
+
+/// One tuning request, the unit the module understands.
+struct FrequencyPlan {
+  uint32_t base_khz;
+  uint32_t step_khz;
+  uint8_t channels;
+  /// Channel (counted from base_khz) that equals the requested frequency.
+  uint8_t channel;
+
+  uint32_t channel_khz(uint8_t index) const { return this->base_khz + this->step_khz * index; }
+  uint32_t frequency_khz() const { return this->channel_khz(this->channel); }
+};
+
+/// Lowest and highest frequency the hardware can be tuned to, in kHz. The two
+/// ranges are 305.000-339.999 MHz and 430.000-439.999 MHz.
+constexpr uint32_t BAND_LOW_FIRST_KHZ = 305000;
+constexpr uint32_t BAND_LOW_LAST_KHZ = 339999;
+constexpr uint32_t BAND_HIGH_FIRST_KHZ = 430000;
+constexpr uint32_t BAND_HIGH_LAST_KHZ = 439999;
+
+constexpr size_t CONFIG_BLOB_SIZE = 204;
+
+namespace radio_tables {
+
+constexpr size_t REGISTER_COUNT = 96;
+constexpr size_t SYNTH_OFFSET = 0x18;
+constexpr size_t SYNTH_SIZE = 8;
+constexpr size_t HIGH_BAND_OFFSET = 0x55;
+constexpr size_t HIGH_BAND_SIZE = 11;
+/// Base frequencies above this one use the second register set.
+constexpr uint32_t HIGH_BAND_ABOVE_KHZ = 340000;
+
+/// Register values every tuning starts from (index = register address).
+constexpr uint8_t REGISTER_TEMPLATE[REGISTER_COUNT] = {
+    0x00, 0x66, 0xEC, 0x1D, 0x70, 0x80, 0x14, 0x08, 0x91, 0x02, 0x02, 0xD0, 0xAE, 0xE0, 0x35, 0x00,
+    0x00, 0xF4, 0x10, 0xE2, 0x42, 0x20, 0x21, 0x81, 0x46, 0x83, 0x32, 0x57, 0x46, 0x62, 0x27, 0x16,
+    0xD3, 0x64, 0xA0, 0x77, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x29, 0xC0, 0x28, 0x0A, 0x53,
+    0x17, 0x07, 0x3C, 0x2F, 0x00, 0x26, 0x05, 0x05, 0x10, 0x08, 0x00, 0xAA, 0x02, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0xD4, 0x2D, 0x00, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x60,
+    0xFF, 0x00, 0x00, 0x1F, 0x10, 0x55, 0xB9, 0x04, 0x00, 0x03, 0x70, 0x00, 0xB4, 0x1E, 0x3F, 0x7F,
+};
+
+/// Replaces registers 0x55 to 0x5F for base frequencies above 340 MHz.
+constexpr uint8_t HIGH_BAND_REGISTERS[HIGH_BAND_SIZE] = {
+    0x55, 0x26, 0x03, 0x00, 0x03, 0x70, 0x00, 0x8A, 0x18, 0x3F, 0x7F,
+};
+
+/// A run of base frequencies that share one stride, with the row of
+/// SYNTH_WORDS where it starts.
+struct Bank {
+  uint32_t first_khz;
+  uint32_t stride_khz;
+  uint8_t first_row;
+  uint8_t rows;
+};
+
+constexpr Bank BANKS[] = {
+    {305000, 1000, 0, 35},   // 305-339 MHz
+    {430000, 1000, 35, 10},  // 430-439 MHz
+    {315100, 100, 45, 9},    // 315.1-315.9 MHz
+    {433100, 100, 54, 9},    // 433.1-433.9 MHz
+};
+constexpr size_t BANK_COUNT = sizeof(BANKS) / sizeof(BANKS[0]);
+constexpr size_t ROW_COUNT = 63;
+
+/// Registers 0x18 to 0x1F per base frequency: two 32 bit synthesizer words,
+/// most significant byte first. The second word is always a little lower than
+/// the first (probably the other end of the 20 channel window).
+constexpr uint8_t SYNTH_WORDS[ROW_COUNT][SYNTH_SIZE] = {
+    {0x46, 0x83, 0x32, 0x57, 0x46, 0x62, 0x27, 0x16}, {0x46, 0xBE, 0xE3, 0x5A, 0x46, 0x9D, 0xD8, 0x19},
+    {0x46, 0xF9, 0x94, 0x5E, 0x46, 0xD8, 0x89, 0x1D}, {0x47, 0x34, 0x46, 0x52, 0x47, 0x13, 0x3B, 0x11},
+    {0x47, 0x6F, 0xF7, 0x55, 0x47, 0x4E, 0xEC, 0x14}, {0x47, 0xAB, 0xA8, 0x59, 0x47, 0x89, 0x9D, 0x18},
+    {0x47, 0xE6, 0x59, 0x5D, 0x47, 0xC4, 0x4E, 0x1C}, {0x48, 0x21, 0x0B, 0x51, 0x48, 0x00, 0x00, 0x10},
+    {0x48, 0x5C, 0xBC, 0x54, 0x48, 0x3B, 0xB1, 0x13}, {0x48, 0x97, 0x6D, 0x58, 0x48, 0x76, 0x62, 0x17},
+    {0x48, 0xD2, 0x1E, 0x5C, 0x48, 0xB1, 0x13, 0x1B}, {0x48, 0x0D, 0xD0, 0x5F, 0x48, 0xEC, 0xC4, 0x1E},
+    {0x49, 0x48, 0x81, 0x53, 0x49, 0x27, 0x76, 0x12}, {0x49, 0x83, 0x32, 0x57, 0x49, 0x62, 0x27, 0x16},
+    {0x49, 0xBE, 0xE3, 0x5A, 0x49, 0x9D, 0xD8, 0x19}, {0x49, 0xF9, 0x94, 0x5E, 0x49, 0xD8, 0x89, 0x1D},
+    {0x4A, 0x34, 0x46, 0x52, 0x4A, 0x13, 0x3B, 0x11}, {0x4A, 0x6F, 0xF7, 0x55, 0x4A, 0x4E, 0xEC, 0x14},
+    {0x4A, 0xAB, 0xA8, 0x59, 0x4A, 0x89, 0x9D, 0x18}, {0x4A, 0xE6, 0x59, 0x5D, 0x4A, 0xC4, 0x4E, 0x1C},
+    {0x4B, 0x21, 0x0B, 0x51, 0x4B, 0x00, 0x00, 0x10}, {0x4B, 0x5C, 0xBC, 0x54, 0x4B, 0x3B, 0xB1, 0x13},
+    {0x4B, 0x97, 0x6D, 0x58, 0x4B, 0x76, 0x62, 0x17}, {0x4B, 0xD2, 0x1E, 0x5C, 0x4B, 0xB1, 0x13, 0x1B},
+    {0x4B, 0x0D, 0xD0, 0x5F, 0x4B, 0xEC, 0xC4, 0x1E}, {0x4C, 0x48, 0x81, 0x53, 0x4C, 0x27, 0x76, 0x12},
+    {0x4C, 0x83, 0x32, 0x57, 0x4C, 0x62, 0x27, 0x16}, {0x4C, 0xBE, 0xE3, 0x5A, 0x4C, 0x9D, 0xD8, 0x19},
+    {0x4C, 0xF9, 0x94, 0x5E, 0x4C, 0xD8, 0x89, 0x1D}, {0x4D, 0x34, 0x46, 0x52, 0x4D, 0x13, 0x3B, 0x11},
+    {0x4D, 0x6F, 0xF7, 0x55, 0x4D, 0x4E, 0xEC, 0x14}, {0x4D, 0xAB, 0xA8, 0x59, 0x4D, 0x89, 0x9D, 0x18},
+    {0x4D, 0xE6, 0x59, 0x5D, 0x4D, 0xC4, 0x4E, 0x1C}, {0x4E, 0x21, 0x0B, 0x51, 0x4E, 0x00, 0x00, 0x10},
+    {0x4E, 0x5C, 0xBC, 0x54, 0x4E, 0x3B, 0xB1, 0x13}, {0x42, 0x3D, 0x28, 0x13, 0x42, 0x27, 0x76, 0x12},
+    {0x42, 0x64, 0x9E, 0x15, 0x42, 0x4E, 0xEC, 0x14}, {0x42, 0x8C, 0x14, 0x18, 0x42, 0x76, 0x62, 0x17},
+    {0x42, 0xB3, 0x8A, 0x1A, 0x42, 0x9D, 0xD8, 0x19}, {0x42, 0xDB, 0x00, 0x1D, 0x42, 0xC4, 0x4E, 0x1C},
+    {0x42, 0x02, 0x77, 0x1F, 0x42, 0xEC, 0xC4, 0x1E}, {0x43, 0x29, 0xED, 0x11, 0x43, 0x13, 0x3B, 0x11},
+    {0x43, 0x51, 0x63, 0x14, 0x43, 0x3B, 0xB1, 0x13}, {0x43, 0x78, 0xD9, 0x16, 0x43, 0x62, 0x27, 0x16},
+    {0x43, 0x9F, 0x4F, 0x19, 0x43, 0x89, 0x9D, 0x18}, {0x48, 0x58, 0x7D, 0x5C, 0x48, 0x37, 0x72, 0x1B},
+    {0x48, 0xDE, 0xDB, 0x5C, 0x48, 0xBD, 0xD0, 0x1B}, {0x48, 0x64, 0x3A, 0x5D, 0x48, 0x42, 0x2F, 0x1C},
+    {0x48, 0xEA, 0x98, 0x5D, 0x48, 0xC8, 0x8D, 0x1C}, {0x48, 0x6F, 0xF7, 0x5D, 0x48, 0x4E, 0xEC, 0x1C},
+    {0x48, 0xF5, 0x55, 0x5E, 0x48, 0xD4, 0x4A, 0x1D}, {0x48, 0x7B, 0xB4, 0x5E, 0x48, 0x5A, 0xA9, 0x1D},
+    {0x48, 0x01, 0x13, 0x5F, 0x48, 0xE0, 0x07, 0x1E}, {0x48, 0x87, 0x71, 0x5F, 0x48, 0x66, 0x66, 0x1E},
+    {0x42, 0xB7, 0xC9, 0x1A, 0x42, 0xA1, 0x17, 0x1A}, {0x42, 0xBB, 0x08, 0x1B, 0x42, 0xA5, 0x56, 0x1A},
+    {0x42, 0xBF, 0x47, 0x1B, 0x42, 0xA9, 0x95, 0x1A}, {0x42, 0xC3, 0x86, 0x1B, 0x42, 0xAD, 0xD4, 0x1A},
+    {0x42, 0xC7, 0xC5, 0x1B, 0x42, 0xB1, 0x13, 0x1B}, {0x42, 0xCB, 0x04, 0x1C, 0x42, 0xB5, 0x52, 0x1B},
+    {0x42, 0xCF, 0x43, 0x1C, 0x42, 0xB9, 0x91, 0x1B}, {0x42, 0xD3, 0x82, 0x1C, 0x42, 0xBD, 0xD0, 0x1B},
+    {0x42, 0xD7, 0xC1, 0x1C, 0x42, 0xC0, 0x0F, 0x1C},
+};
+
+}  // namespace radio_tables
+
+/// Turns a frequency into a tuning request. Returns false outside the two
+/// bands the hardware covers.
+inline bool plan_frequency(uint32_t frequency_khz, FrequencyPlan *plan) {
+  // Unsigned subtraction folds the "at least" and "below" checks into one.
+  const bool fine_315 = frequency_khz - 315000u < 1000u;
+  const bool fine_433 = frequency_khz - 433000u < 1000u;
+  const bool coarse = frequency_khz - BAND_LOW_FIRST_KHZ <= BAND_LOW_LAST_KHZ - BAND_LOW_FIRST_KHZ ||
+                      frequency_khz - BAND_HIGH_FIRST_KHZ <= BAND_HIGH_LAST_KHZ - BAND_HIGH_FIRST_KHZ;
+  if (fine_315 || fine_433) {
+    plan->step_khz = 10;
+    plan->base_khz = frequency_khz - frequency_khz % 100;
+    plan->channel = static_cast<uint8_t>((frequency_khz % 100) / plan->step_khz);
+  } else if (coarse) {
+    plan->step_khz = 100;
+    plan->base_khz = frequency_khz - frequency_khz % 1000;
+    plan->channel = static_cast<uint8_t>((frequency_khz % 1000) / plan->step_khz);
+  } else {
+    return false;
+  }
+  plan->channels = 20;
+  return true;
+}
+
+/// Automatic frequency control threshold the stock firmware picks for a request.
+/// The rules cover more request shapes than plan_frequency() produces (for
+/// example 500 kHz steps used by its frequency scan); they are kept so the
+/// numbers stay comparable to the original. Returns false if no rule applies.
+inline bool afc_threshold(const FrequencyPlan &plan, uint8_t *threshold) {
+  const uint32_t base = plan.base_khz;
+  const uint32_t step = plan.step_khz;
+  const uint32_t channels = plan.channels;
+  const auto within = [base](uint32_t first, uint32_t span) { return base - first <= span; };
+
+  if (base == 305000 && step == 500 && channels <= 70) {
+    *threshold = 12;
+  } else if (within(305000, 11015) && step == 100 && channels <= 20) {
+    *threshold = 11;
+  } else if (within(316000, 24000) && step == 100 && channels <= 20) {
+    *threshold = 12;
+  } else if (within(315000, 900) && step == 10 && channels <= 20) {
+    if (base != 315900) {
+      *threshold = 11;
+    } else if (channels == 14) {
+      *threshold = 9;
+    } else if (channels == 15) {
+      *threshold = 0;
+    } else if (channels == 16) {
+      *threshold = 8;
+    } else {
+      *threshold = 11;
+    }
+  } else if (base == 430000 && step == 500 && channels <= 20) {
+    *threshold = 11;
+  } else if (within(430000, 4999) && step == 100 && channels <= 20) {
+    *threshold = 10;
+  } else if (within(435000, 4000) && step == 100 && channels <= 20) {
+    *threshold = (base == 435000 && channels == 2) ? 10 : 11;
+  } else if (within(433000, 900) && step == 10 && channels <= 20) {
+    *threshold = static_cast<uint8_t>(step);
+  } else {
+    return false;
+  }
+  return true;
+}
+
+/// Writes the configuration blob for `plan` into `out` (at least
+/// CONFIG_BLOB_SIZE bytes) and stores its size. Returns false if the base
+/// frequency has no row in the tables.
+inline bool build_config(const FrequencyPlan &plan, uint8_t *out, size_t capacity, size_t *size) {
+  using namespace radio_tables;
+  if (capacity < CONFIG_BLOB_SIZE)
+    return false;
+
+  // Find the table row of the base frequency.
+  int row = -1;
+  for (size_t b = 0; b < BANK_COUNT && row < 0; b++) {
+    for (uint32_t n = 0; n < BANKS[b].rows; n++) {
+      if (plan.base_khz == BANKS[b].first_khz + BANKS[b].stride_khz * n) {
+        row = BANKS[b].first_row + n;
+        break;
+      }
+    }
+  }
+  uint8_t afc = 0;
+  if (row < 0 || !afc_threshold(plan, &afc))
+    return false;
+
+  uint8_t registers[REGISTER_COUNT];
+  for (size_t i = 0; i < REGISTER_COUNT; i++)
+    registers[i] = REGISTER_TEMPLATE[i];
+  for (size_t i = 0; i < SYNTH_SIZE; i++)
+    registers[SYNTH_OFFSET + i] = SYNTH_WORDS[row][i];
+  if (plan.base_khz > HIGH_BAND_ABOVE_KHZ) {
+    for (size_t i = 0; i < HIGH_BAND_SIZE; i++)
+      registers[HIGH_BAND_OFFSET + i] = HIGH_BAND_REGISTERS[i];
+  }
+
+  size_t pos = 0;
+  out[pos++] = 1;  // record: registers
+  out[pos++] = REGISTER_COUNT * 2;
+  for (size_t address = 0; address < REGISTER_COUNT; address++) {
+    out[pos++] = static_cast<uint8_t>(address);
+    out[pos++] = registers[address];
+  }
+  out[pos++] = 6;  // record: AFC threshold and scaled step
+  out[pos++] = 2;
+  out[pos++] = afc;
+  out[pos++] = static_cast<uint8_t>(plan.step_khz * 10 / 25);
+  out[pos++] = 7;  // record: constant
+  out[pos++] = 1;
+  out[pos++] = 0x10;
+  out[pos++] = 8;  // record: constant
+  out[pos++] = 1;
+  out[pos++] = 0x00;
+  *size = pos;
+  return true;
+}
+
+}  // namespace esphome::bl3361

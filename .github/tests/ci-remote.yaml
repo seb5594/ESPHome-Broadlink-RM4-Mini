@@ -5,12 +5,15 @@
 substitutions:
   name: ci-remote-__DEVICE__
   friendly_name: CI Remote __DEVICE__
+  # Read by rf.yaml, which loads its component from the commit under test.
+  firmware_url: __REPO__
+  firmware_ref: __REF__
 
 packages:
   remote:
     url: __REPO__
     ref: __REF__
-    files: [devices/__DEVICE__/__DEVICE__.yaml]
+    files: [__FILES__]
 
 wifi:
   ssid: ci-network

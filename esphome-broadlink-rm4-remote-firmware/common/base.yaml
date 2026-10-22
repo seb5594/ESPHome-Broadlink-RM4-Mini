@@ -1,11 +1,11 @@
 # Home Assistant connection shared by all devices in this repository.
 #
 # Credentials and keys are not part of it, they belong into your own device
-# config (see the example.yaml next to each device).
+# config (see the *.example.yaml files in the repository root).
 
 substitutions:
   # Shown in the device info in Home Assistant, see `esphome.project`.
-  project_version: "1.1.0-dev"
+  project_version: "1.1.0"
 
 api:
 

@@ -1,13 +1,13 @@
 # Broadlink RM4 Mini / RM4C Mini as a native Home Assistant IR proxy
 #
 # Hardware:  board RM4_MINI-MAIN-V4.0.1, Wi-Fi module BL3357-P (Realtek RTL8720CF)
-# Project:   https://github.com/seb5594/ESPHome-Broadlink-RM4-Mini
+# Project:   https://github.com/seb5594/ESPHome-Broadlink-RM4-Remote-Firmware
 #
 # This file is the entry point of the device. It holds the pin map and the
 # identity, the actual behaviour comes from the shared layers it pulls in.
 # Your own device config includes this file as a package and only adds Wi-Fi
-# credentials and keys, see example.yaml. Every substitution below can be
-# overridden there.
+# credentials and keys, see rm4-mini.example.yaml in the repository root.
+# Every substitution below can be overridden there.
 
 substitutions:
   name: broadlink-rm4-mini

@@ -1,0 +1,51 @@
+# Device config for the ESPHome dashboard (or the ESPHome CLI).
+#
+# Copy this file into your ESPHome folder, adjust the substitutions and
+# put the secrets into your secrets.yaml (see secrets.yaml.example).
+# All hardware settings are pulled from the GitHub repository.
+#
+# Infrared works like on the RM4 Mini. The 433 MHz radio is EXPERIMENTAL and not
+# confirmed on a device yet; it is the rf.yaml line below. Leave it commented
+# out for an infrared-only device.
+
+substitutions:
+  name: broadlink-rm4-pro
+  friendly_name: Broadlink RM4 Pro
+  # Raise to 80ms if long air conditioner codes arrive split up.
+  # ir_receiver_idle: 25ms
+
+  # The branch or tag of this repository that provides the firmware parts. The
+  # radio component is loaded from it as well, so keep it in sync with `ref`.
+  firmware_ref: main
+  # 433 MHz carrier, only used together with rf.yaml.
+  # rf_frequency: 433.92MHz
+
+packages:
+  broadlink_rm4_pro:
+    url: https://github.com/seb5594/ESPHome-Broadlink-RM4-Remote-Firmware
+    ref: ${firmware_ref}
+    files:
+      - esphome-broadlink-rm4-remote-firmware/devices/rm4-pro/rm4-pro.yaml
+      # EXPERIMENTAL 433 MHz radio, see README.md in the repository root
+      # - esphome-broadlink-rm4-remote-firmware/devices/rm4-pro/rf.yaml
+    refresh: 1d
+  # Working from a local clone instead? Use these lines in place of the block above:
+  # broadlink_rm4_pro: !include esphome-broadlink-rm4-remote-firmware/devices/rm4-pro/rm4-pro.yaml
+  # radio: !include esphome-broadlink-rm4-remote-firmware/devices/rm4-pro/rf.yaml
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Optional: DNS suffix of your network, e.g. ".iot.lan" (default ".local")
+  # domain: !secret wifi_domain
+  ap:
+    password: !secret fallback_ap_password
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  # Encrypts OTA updates with the API key above, no extra password needed.
+  - id: !extend ota_esphome
+    encryption:

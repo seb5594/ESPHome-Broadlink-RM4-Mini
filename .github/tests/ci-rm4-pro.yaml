@@ -6,7 +6,7 @@ substitutions:
   friendly_name: CI Broadlink RM4 Pro
 
 packages:
-  broadlink_rm4_pro: !include ../../devices/rm4-pro/rm4-pro.yaml
+  broadlink_rm4_pro: !include ../../esphome-broadlink-rm4-remote-firmware/devices/rm4-pro/rm4-pro.yaml
 
 wifi:
   ssid: ci-network
