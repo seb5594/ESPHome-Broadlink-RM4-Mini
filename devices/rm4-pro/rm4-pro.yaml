@@ -1,0 +1,38 @@
+# Broadlink RM4 Pro as a native Home Assistant IR proxy
+#
+# Hardware:  board RM4_PRO V2.1.6, Wi-Fi module BL3357-P (Realtek RTL8720CF),
+#            separate 433 MHz RF module BL3361-1
+# Project:   https://github.com/seb5594/ESPHome-Broadlink-RM4-Mini
+#
+# Status: work in progress on the dev branch. Infrared is built from the same
+# layers as the RM4 Mini. The pin map below comes from
+# https://github.com/phdindota/broadlink-rm4pro-esphome and has not been
+# confirmed on a device by this project yet. 433 MHz RF is not part of this
+# file, see devices/rm4-pro/README.md and rf-probe.yaml.
+#
+# Your own device config includes this file as a package and only adds Wi-Fi
+# credentials and keys, see example.yaml. Every substitution below can be
+# overridden there.
+
+substitutions:
+  name: broadlink-rm4-pro
+  friendly_name: Broadlink RM4 Pro
+
+  # Pin map, see the note above.
+  pin_ir_tx: PA4
+  pin_ir_rx: PA18
+  pin_status_led: PA7
+  pin_button: PA19
+
+packages:
+  rtl8720c: !include ../../platform/rtl8720c/rtl8720c.yaml
+  base: !include ../../common/base.yaml
+  controls: !include ../../common/controls.yaml
+  ir_proxy: !include ../../common/ir-proxy.yaml
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  project:
+    name: seb5594.broadlink-rm4-pro
+    version: ${project_version}

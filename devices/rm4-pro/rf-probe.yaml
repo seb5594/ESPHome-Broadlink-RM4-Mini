@@ -1,0 +1,29 @@
+# Research helper for the 433 MHz part of the RM4 Pro. Optional.
+#
+# This is NOT a working RF proxy and creates no entity in Home Assistant. It
+# only prints the pulse timings seen on the RF data pin to the log, so the
+# signal can be studied while a 433 MHz transmitter is pressed next to the
+# device. See "433 MHz RF" in devices/rm4-pro/README.md.
+#
+# Add it after the device file, so its logger level wins:
+#   files:
+#     - devices/rm4-pro/rm4-pro.yaml
+#     - devices/rm4-pro/rf-probe.yaml
+
+substitutions:
+  # Raw receiver output according to phdindota/broadlink-rm4pro-esphome.
+  # Point it at another pin to probe a different candidate.
+  pin_rf_data: PA20
+
+remote_receiver:
+  - id: rf_probe_rx
+    pin:
+      number: ${pin_rf_data}
+    # Pulses below 100 us are noise on 433 MHz receivers as well.
+    filter: 100us
+    idle: 10ms
+    dump: raw
+
+logger:
+  # `dump: raw` only prints at DEBUG level.
+  level: DEBUG
