@@ -1,0 +1,25 @@
+# Template for the remote package check of the CI workflow. The placeholders
+# are replaced with sed, then the result is validated the same way a user's
+# dashboard config pulls the package from GitHub. Not meant for flashing.
+
+substitutions:
+  name: ci-remote-__DEVICE__
+  friendly_name: CI Remote __DEVICE__
+
+packages:
+  remote:
+    url: __REPO__
+    ref: __REF__
+    files: [devices/__DEVICE__/__DEVICE__.yaml]
+
+wifi:
+  ssid: ci-network
+  password: ci-password
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - id: !extend ota_esphome
+    encryption:

@@ -1,0 +1,21 @@
+# Used by the CI workflow to validate and build the package from the current
+# branch. Not meant for flashing.
+
+substitutions:
+  name: ci-broadlink-rm4-pro
+  friendly_name: CI Broadlink RM4 Pro
+
+packages:
+  broadlink_rm4_pro: !include ../../devices/rm4-pro/rm4-pro.yaml
+
+wifi:
+  ssid: ci-network
+  password: ci-password
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - id: !extend ota_esphome
+    encryption:
