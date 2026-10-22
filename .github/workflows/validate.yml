@@ -67,9 +67,9 @@ jobs:
         run: |
           echo "api_encryption_key: \"$(openssl rand -base64 32)\"" > .github/tests/secrets.yaml
       - name: Validate config
-        run: esphome -s firmware_url "$FIRMWARE_URL" -s firmware_ref "$FIRMWARE_REF" config .github/tests/${{ matrix.config }}.yaml
+        run: bash .github/tests/run_logged.sh esphome -s firmware_url "$FIRMWARE_URL" -s firmware_ref "$FIRMWARE_REF" config .github/tests/${{ matrix.config }}.yaml
       - name: Compile firmware
-        run: esphome -s firmware_url "$FIRMWARE_URL" -s firmware_ref "$FIRMWARE_REF" compile .github/tests/${{ matrix.config }}.yaml
+        run: bash .github/tests/run_logged.sh esphome -s firmware_url "$FIRMWARE_URL" -s firmware_ref "$FIRMWARE_REF" compile .github/tests/${{ matrix.config }}.yaml
       - name: Check IR receiver fix
         run: bash .github/tests/check_receiver_fix.sh .github/tests/.esphome/build
 
@@ -114,9 +114,9 @@ jobs:
               -e "s|__FILES__|${{ matrix.files }}|g" \
               .github/tests/ci-remote.yaml > .github/tests/ci-remote-rendered.yaml
       - name: Validate config
-        run: esphome config .github/tests/ci-remote-rendered.yaml
+        run: bash .github/tests/run_logged.sh esphome config .github/tests/ci-remote-rendered.yaml
       - name: Compile firmware
         if: matrix.compile
         run: |
-          esphome compile .github/tests/ci-remote-rendered.yaml
+          bash .github/tests/run_logged.sh esphome compile .github/tests/ci-remote-rendered.yaml
           bash .github/tests/check_receiver_fix.sh .github/tests/.esphome/build
