@@ -26,3 +26,17 @@ Raise `ir_receiver_idle` to `80ms`.
 **The device doesn't show up after flashing**
 It opens a hotspot named after the device when it can't connect. Check the
 Wi-Fi credentials in your secrets; only 2.4 GHz networks work.
+
+**The 433 MHz radio does not answer (RM4 Pro)**
+The log says `The RF module does not answer on the UART`. The radio is
+experimental and its UART pins are the least certain part of the setup, see
+[RF module protocol](rf-protocol.md#what-is-not-confirmed). Check that
+`rf.yaml` is in the package list, then try the other pad pair of UART0:
+`pin_rf_uart_tx: PA11` and `pin_rf_uart_rx: PA12`. Please report what you find
+in an [issue](https://github.com/seb5594/ESPHome-Broadlink-RM4-Remote-Firmware/issues).
+
+**The radio answers, but nothing is received**
+Test against a known good signal source first, see
+[Testing 433 MHz](433mhz.md#testing-without-owning-a-433-mhz-device). The
+`rf_scan` action shows whether the radio hears anything at all. If it does but
+no code arrives, try `inverted: true` on the `data_pin`.

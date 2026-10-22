@@ -6,12 +6,13 @@ comes from the layers below it:
 
 | Layer | File | Purpose |
 |---|---|---|
-| Your device | `example.yaml` of the device | Name, Wi-Fi, API key, hotspot password. Pulls in the device file straight from GitHub. |
-| Device | [`devices/<device>/<device>.yaml`](../devices) | Pin map, name and project info. Used as a package and never edited by you. |
-| IR proxy | [`common/ir-proxy.yaml`](../common/ir-proxy.yaml) | IR receiver, IR transmitter and the Home Assistant `infrared` entities. |
-| Controls | [`common/controls.yaml`](../common/controls.yaml) | Status LED and physical button. |
-| Base | [`common/base.yaml`](../common/base.yaml) | API, OTA, fallback hotspot, captive portal. |
-| Platform | [`platform/rtl8720c/rtl8720c.yaml`](../platform/rtl8720c/rtl8720c.yaml) | Chip specifics: board, logger, the [receiver fix](#the-receiver-fix). |
+| Your device | [`rm4-mini.example.yaml`](../rm4-mini.example.yaml), [`rm4-pro.example.yaml`](../rm4-pro.example.yaml) | Name, Wi-Fi, API key, hotspot password. Pulls in the device file straight from GitHub. |
+| Device | [`devices/<device>/<device>.yaml`](../esphome-broadlink-rm4-remote-firmware/devices) | Pin map, name and project info. Used as a package and never edited by you. |
+| 433 MHz radio (RM4 Pro, experimental) | [`devices/rm4-pro/rf.yaml`](../esphome-broadlink-rm4-remote-firmware/devices/rm4-pro/rf.yaml) | Optional. The UART to the radio module and the [`bl3361` component](../esphome-broadlink-rm4-remote-firmware/components/bl3361). |
+| IR proxy | [`common/ir-proxy.yaml`](../esphome-broadlink-rm4-remote-firmware/common/ir-proxy.yaml) | IR receiver, IR transmitter and the Home Assistant `infrared` entities. |
+| Controls | [`common/controls.yaml`](../esphome-broadlink-rm4-remote-firmware/common/controls.yaml) | Status LED and physical button. |
+| Base | [`common/base.yaml`](../esphome-broadlink-rm4-remote-firmware/common/base.yaml) | API, OTA, fallback hotspot, captive portal. |
+| Platform | [`platform/rtl8720c/rtl8720c.yaml`](../esphome-broadlink-rm4-remote-firmware/platform/rtl8720c/rtl8720c.yaml) | Chip specifics: board, logger, the [receiver fix](#the-receiver-fix). |
 
 That keeps your own file at a few lines, and fixes in this repository reach
 your device with the next build. `refresh: 1d` makes ESPHome check for a new
@@ -80,7 +81,7 @@ RTL8720C can't use both at once. The next `digitalRead()` call sets the pin up
 as a GPIO input again and frees the interrupt on the way, so the receiver sees
 the first edge of a code and then nothing at all.
 
-[`platform/rtl8720c/irq_read.c`](../platform/rtl8720c/irq_read.c) fixes that
+[`irq_read.c`](../esphome-broadlink-rm4-remote-firmware/platform/rtl8720c/irq_read.c) fixes that
 without touching LibreTiny:
 
 - The linker option `-Wl,--wrap=digitalRead` sends every `digitalRead()` call
@@ -248,6 +249,34 @@ firmware, so learning new devices needs no reflash. `receiver_frequency` does
 not change the hardware, it only tells Home Assistant that the receiver
 demodulates 38 kHz signals.
 
+## 433 MHz radio layer (RM4 Pro, experimental)
+
+[`rf.yaml`](../esphome-broadlink-rm4-remote-firmware/devices/rm4-pro/rf.yaml) is an optional package for the
+RM4 Pro. It is not part of `rm4-pro.yaml`, so an infrared-only device stays
+as small as it was:
+
+```yaml
+uart:        # talks to the radio module
+  - id: rf_uart
+    tx_pin: PA14
+    rx_pin: PA13
+    baud_rate: 115200
+    parity: EVEN
+
+bl3361:      # external component of this repository
+  uart_id: rf_uart
+  data_pin: PA20
+  frequency: 433.92MHz
+```
+
+The component loads from this repository through `external_components`, with
+`firmware_ref` choosing the branch or tag. Keep it equal to the `ref` of your
+package. The component has its own options (`filter`, `idle`, `min_pulses`,
+`rssi`, `on_receive`) and actions (`bl3361.send_raw`, `bl3361.set_frequency`,
+`bl3361.scan`, `bl3361.start_receive`, `bl3361.stop`), all described in the
+[433 MHz guide](433mhz.md). How the radio module works is written down in
+[RF module protocol](rf-protocol.md).
+
 ## Customizing
 
 Everything in the package can be changed from your own config:
@@ -260,9 +289,9 @@ substitutions:
 
 packages:
   broadlink_rm4_mini:
-    url: https://github.com/seb5594/ESPHome-Broadlink-RM4-Mini
+    url: https://github.com/seb5594/ESPHome-Broadlink-RM4-Remote-Firmware
     ref: main
-    files: [devices/rm4-mini/rm4-mini.yaml]
+    files: [esphome-broadlink-rm4-remote-firmware/devices/rm4-mini/rm4-mini.yaml]
 
 # Add components ...
 sensor:

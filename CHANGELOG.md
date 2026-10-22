@@ -1,27 +1,42 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 - 2026-10-23
 
-Work in progress on the `dev` branch.
+The repository grows from a single-device project into ESPHome Broadlink RM4,
+with a second device and an experimental 433 MHz radio.
 
-- The repository grows from a single-device project into ESPHome Broadlink
-  RM4. The configuration is split into packages: `platform/rtl8720c` (chip
+### Added
+
+- **Broadlink RM4 Pro** (infrared). All pins are confirmed in the hardware
+  profile of the stock firmware, which was read from a flash dump.
+- **Experimental 433 MHz radio of the RM4 Pro**: the new external component
+  `bl3361` and the optional package `rf.yaml`. It tunes the radio over its UART
+  (305-340 MHz and 430-440 MHz), receives raw codes as Home Assistant events
+  (`esphome.<name>_rf_received`) and sends them (`rf_send_raw`). Further
+  actions: `rf_set_frequency` and `rf_scan`, plus a signal strength sensor.
+  Written from the stock firmware, not confirmed on a device yet.
+- Documentation: 433 MHz guide (testing without a device, detecting what is on
+  the air, rules for transmitting), RF module protocol, a page per device, a
+  device table and opening guides in the README.
+- CI: host tests for the radio driver, a build of every device and the RF
+  config, and a check that every device file works as a remote package.
+
+### Changed
+
+- The configuration is split into packages: `platform/rtl8720c` (chip
   specifics and the receiver fix), `common` (base, controls, IR proxy) and one
-  folder per device under `devices`.
-- **Breaking for package users:** the RM4 Mini device file moved from
-  `broadlink-rm4-mini.yaml` to `devices/rm4-mini/rm4-mini.yaml`. Change the
-  `files:` entry of your package accordingly when you switch to this version.
-  The `example.yaml` moved to `devices/rm4-mini/` as well.
-- The device file now holds only the pin map (`pin_*` substitutions) and the
-  identity, the shared layers read the pins from there.
-- New device: Broadlink RM4 Pro, infrared only, pin map not yet confirmed on
-  hardware.
-- New optional `devices/rm4-pro/rf-probe.yaml` to log the raw 433 MHz pin while
-  the RF protocol is being reverse engineered.
-- Documentation split into a page per device and shared pages for
-  configuration, Home Assistant and troubleshooting.
-- CI builds every device against ESPHome 2026.9.0 and the current release and
-  checks on every push that the device files also work as a remote package.
+  folder per device under `devices`. They all live in the folder
+  `esphome-broadlink-rm4-remote-firmware`; the example configs of the devices
+  are in the repository root.
+- The device file holds only the pin map and the identity, the shared layers
+  read the pins from there.
+- **Package users:** the RM4 Mini device file is now
+  `esphome-broadlink-rm4-remote-firmware/devices/rm4-mini/rm4-mini.yaml`.
+  Configs from 1.0.0 keep working: `broadlink-rm4-mini.yaml` in the root of the
+  repository forwards to it. New configs should start from
+  `rm4-mini.example.yaml`.
+- The repository was renamed to `ESPHome-Broadlink-RM4-Remote-Firmware`. GitHub
+  redirects the old name.
 
 ## 1.0.0 - 2026-10-14
 

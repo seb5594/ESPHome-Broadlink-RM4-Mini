@@ -22,7 +22,7 @@ infrared integrations.
   carrier, non-blocking, so Wi-Fi keeps running while long codes go out)
 - Receive IR codes from any remote with `remote_receiver`, including a small
   fix that makes interrupt-driven pins work on this chip
-  ([details](../../docs/configuration.md#the-receiver-fix))
+  ([details](../configuration.md#the-receiver-fix))
 - Both exposed to Home Assistant as native infrared entities through
   `ir_rf_proxy`, no custom code or lambdas
 - Status LED and the physical button
@@ -42,7 +42,7 @@ infrared integrations.
 Broadlink has changed the internals over the years. Check the board marking
 and the module before you order a UART adapter: other chips need a different
 firmware. Looking for the RM4 Pro (same chip, plus 433 MHz RF)? See the
-[RM4 Pro page](../rm4-pro/README.md).
+[RM4 Pro page](rm4-pro.md).
 
 ## Pin map
 
@@ -101,7 +101,7 @@ to put it back afterwards.
 ### 2. Connect the UART adapter
 
 <p align="center">
-  <img src="images/pcb-back.jpg" alt="Back of the RM4_MINI-MAIN-V4.0.1 board with the test points IOA0, IOA13, 3.3V, U2-TX, U2-RX and GND along the right edge" width="420">
+  <img src="../images/pcb-back.jpg" alt="Back of the RM4_MINI-MAIN-V4.0.1 board with the test points IOA0, IOA13, 3.3V, U2-TX, U2-RX and GND along the right edge" width="420">
 </p>
 
 The six test points along the edge of the board are plated through-holes.
@@ -109,7 +109,7 @@ Solder short wires to `U2-TX`, `U2-RX` and `GND`, or hold pin headers or pogo
 pins in place if you don't want to solder.
 
 <p align="center">
-  <img src="images/uart-wiring.svg" alt="Wiring: U2-TX to adapter RX, U2-RX to adapter TX, GND to GND, and a bridge from IOA0 to 3.3V while flashing" width="760">
+  <img src="../images/uart-wiring.svg" alt="Wiring: U2-TX to adapter RX, U2-RX to adapter TX, GND to GND, and a bridge from IOA0 to 3.3V while flashing" width="760">
 </p>
 
 | UART adapter | Board pad |
@@ -150,7 +150,7 @@ Keep this file. It is the only way back to the Broadlink firmware.
 1. Create a new device with **+ New device**. The board type you pick in the
    wizard doesn't matter, the config gets replaced in the next step.
 2. Open the new config with **Edit**, replace everything with the content of
-   [`example.yaml`](example.yaml) and adjust the names at the top.
+   [`rm4-mini.example.yaml`](../../rm4-mini.example.yaml) and adjust the names at the top.
 3. Add the keys from [`secrets.yaml.example`](../../secrets.yaml.example) to your
    secrets (**Secrets** in the top right corner of the dashboard).
 4. **Install** → **Manual download** → **UF2 package (recommended)**.
@@ -158,10 +158,10 @@ Keep this file. It is the only way back to the Broadlink firmware.
 **ESPHome command line**
 
 ```bash
-git clone https://github.com/seb5594/ESPHome-Broadlink-RM4-Mini.git
-cd ESPHome-Broadlink-RM4-Mini
+git clone https://github.com/seb5594/ESPHome-Broadlink-RM4-Remote-Firmware.git
+cd ESPHome-Broadlink-RM4-Remote-Firmware
 cp secrets.yaml.example secrets.yaml           # fill in your values
-cp devices/rm4-mini/example.yaml my-rm4.yaml   # adjust name and friendly_name
+cp rm4-mini.example.yaml my-rm4.yaml           # adjust name and friendly_name
 esphome compile my-rm4.yaml
 ```
 
@@ -197,11 +197,11 @@ To go back to the Broadlink firmware, repeat steps 2, 3 and 6 with
 These parts are the same for all devices of this repository and live in the
 shared docs:
 
-- [ESPHome configuration](../../docs/configuration.md): the layers behind
+- [ESPHome configuration](../configuration.md): the layers behind
   `rm4-mini.yaml`, the receiver fix and how to customize your device
-- [Home Assistant and HAIR](../../docs/home-assistant.md): entities, learning a
+- [Home Assistant and HAIR](../home-assistant.md): entities, learning a
   remote, moving codes over from the Broadlink integration
-- [Troubleshooting](../../docs/troubleshooting.md)
+- [Troubleshooting](../troubleshooting.md)
 
 ## Known limitations
 
@@ -211,4 +211,4 @@ shared docs:
   also the RX line of the flashing UART.
 - The RM4 Mini has no RF hardware. For 433 MHz look at the RM4 Pro.
 - Hardware UART logging stays off, see
-  [`logger`](../../docs/configuration.md#logger).
+  [`logger`](../configuration.md#logger).
