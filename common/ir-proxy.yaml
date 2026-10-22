@@ -1,0 +1,41 @@
+# Infrared emitter and receiver as a native Home Assistant IR proxy.
+#
+# Needs these substitutions from the device file:
+#   pin_ir_tx   pin that drives the IR LEDs
+#   pin_ir_rx   data pin of the IR receiver
+
+substitutions:
+  # Silence that ends a received code. 25 ms suits TV and audio remotes;
+  # raise it (e.g. to 80ms) if long air conditioner codes arrive split up.
+  ir_receiver_idle: 25ms
+
+remote_receiver:
+  - id: ir_rx
+    pin:
+      number: ${pin_ir_rx}
+    # Ignores short flashes of ambient light (sun, some lamps) that are no IR code.
+    filter: 200us
+    idle: ${ir_receiver_idle}
+    # buffer_size is left at ESPHome's default on purpose (room for 1000 pulses),
+    # see docs/configuration.md for the details.
+    # dump: raw  # uncomment to see received codes in the log
+
+remote_transmitter:
+  - id: ir_tx
+    pin: ${pin_ir_tx}
+    carrier_duty_percent: 50%
+    # Sends from a hardware timer, so Wi-Fi and the API keep running
+    # while long codes (e.g. air conditioners) are being transmitted.
+    non_blocking: true
+
+infrared:
+  - platform: ir_rf_proxy
+    id: ir_proxy_tx
+    name: IR Emitter
+    remote_transmitter_id: ir_tx
+
+  - platform: ir_rf_proxy
+    id: ir_proxy_rx
+    name: IR Receiver
+    remote_receiver_id: ir_rx
+    receiver_frequency: 38kHz

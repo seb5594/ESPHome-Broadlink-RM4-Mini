@@ -1,0 +1,32 @@
+# Platform layer for Broadlink devices built around the Realtek RTL8720CF
+# (Wi-Fi module BL3357-P). Everything here depends on the chip only, not on
+# the device it sits in, so every RM4 variant pulls in this file.
+#
+# Requires ESPHome 2026.9.0 or newer: older releases crashed the RTL8720C
+# inside remote_transmitter, which is why earlier projects shipped a custom
+# ir_tx.h. That workaround is no longer needed.
+
+esphome:
+  min_version: 2026.9.0
+  # Lets interrupt-driven pins (the IR receiver) be read from the interrupt
+  # handler. Without it LibreTiny drops the interrupt on the first edge and
+  # nothing is received. Details in irq_read.c. The include path is resolved
+  # next to this file.
+  build_flags:
+    - -Wl,--wrap=digitalRead
+  includes:
+    - irq_read.c
+
+rtl87xx:
+  board: generic-rtl8720cf-2mb-992k
+  family: rtl8720c
+  framework:
+    version: latest
+
+logger:
+  # INFO keeps the small CPU quiet. Use DEBUG together with `dump: raw` on a
+  # receiver when you want to see received codes.
+  level: INFO
+  # The hardware UART stays off, it interferes with the receiver interrupts on
+  # this chip. Logs still work over Wi-Fi.
+  baud_rate: 0

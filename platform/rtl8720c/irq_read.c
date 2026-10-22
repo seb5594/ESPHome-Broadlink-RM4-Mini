@@ -9,7 +9,7 @@
  * receiver lost its interrupt on the very first edge and never saw a code.
  *
  * The firmware is linked with -Wl,--wrap=digitalRead (see the `esphome:`
- * block in broadlink-rm4-mini.yaml), which routes every digitalRead() call
+ * block in rtl8720c.yaml), which routes every digitalRead() call
  * through the function below. Pins with an active interrupt are read through
  * their interrupt object, every other pin goes to LibreTiny's digitalRead()
  * unchanged. LibreTiny itself is not modified.
@@ -22,7 +22,7 @@
 #include <ArduinoPrivate.h>
 
 #if !LT_RTL8720C
-#error "rtl8720c_irq_read.c is only meant for the Realtek RTL8720C"
+#error "irq_read.c is only meant for the Realtek RTL8720C"
 #endif
 
 /* The original digitalRead(), provided by the linker. */

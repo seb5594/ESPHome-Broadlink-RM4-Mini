@@ -2,6 +2,9 @@
 .esphome/
 secrets.yaml
 
+# Rendered by the CI workflow from ci-remote.yaml
+.github/tests/ci-remote-rendered.yaml
+
 # Firmware images and stock backups
 *.bin
 *.uf2

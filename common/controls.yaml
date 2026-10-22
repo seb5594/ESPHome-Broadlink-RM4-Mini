@@ -1,0 +1,19 @@
+# Status LED and physical button.
+#
+# Needs these substitutions from the device file:
+#   pin_status_led   LED pin, lit when the pin is low
+#   pin_button       button pin, pressed when the pin is low
+
+status_led:
+  pin:
+    number: ${pin_status_led}
+    inverted: true
+
+binary_sensor:
+  - platform: gpio
+    id: button
+    name: Button
+    pin:
+      number: ${pin_button}
+      inverted: true
+      mode: INPUT_PULLUP

@@ -14,10 +14,10 @@ packages:
   broadlink_rm4_mini:
     url: https://github.com/seb5594/ESPHome-Broadlink-RM4-Mini
     ref: main
-    files: [broadlink-rm4-mini.yaml]
+    files: [devices/rm4-mini/rm4-mini.yaml]
     refresh: 1d
   # Working from a local clone instead? Use this line in place of the block above:
-  # broadlink_rm4_mini: !include broadlink-rm4-mini.yaml
+  # broadlink_rm4_mini: !include devices/rm4-mini/rm4-mini.yaml
 
 wifi:
   ssid: !secret wifi_ssid

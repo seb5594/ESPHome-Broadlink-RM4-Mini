@@ -1,0 +1,22 @@
+# Home Assistant connection shared by all devices in this repository.
+#
+# Credentials and keys are not part of it, they belong into your own device
+# config (see the example.yaml next to each device).
+
+substitutions:
+  # Shown in the device info in Home Assistant, see `esphome.project`.
+  project_version: "1.1.0-dev"
+
+api:
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+wifi:
+  # Without a connection the device opens a fallback hotspot named after it.
+  ap:
+
+# Web page on the fallback hotspot to enter new Wi-Fi credentials, so a
+# changed password never means opening the case again.
+captive_portal:
