@@ -13,7 +13,6 @@ from esphome.const import (
     CONF_FILTER,
     CONF_FREQUENCY,
     CONF_ID,
-    CONF_TRIGGER_ID,
     CONF_UPDATE_INTERVAL,
     STATE_CLASS_MEASUREMENT,
 )
@@ -97,13 +96,9 @@ CONFIG_SCHEMA = (
                     ): cv.positive_time_period_milliseconds,
                 }
             ),
-            cv.Optional(CONF_ON_RECEIVE): automation.validate_automation(
-                {
-                    cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(
-                        automation.Trigger.template(cg.std_vector.template(cg.int32))
-                    ),
-                }
-            ),
+            # The trigger belongs to the component, so there is exactly one
+            # list of actions.
+            cv.Optional(CONF_ON_RECEIVE): automation.validate_automation(single=True),
         }
     )
     .extend(cv.COMPONENT_SCHEMA)
@@ -142,10 +137,11 @@ async def to_code(config):
         cg.add(var.set_rssi_sensor(rssi))
         cg.add(var.set_rssi_interval(config[CONF_RSSI][CONF_UPDATE_INTERVAL]))
 
-    for conf in config.get(CONF_ON_RECEIVE, []):
-        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var.get_receive_trigger())
+    if CONF_ON_RECEIVE in config:
         await automation.build_automation(
-            trigger, [(cg.std_vector.template(cg.int32), "x")], conf
+            var.get_receive_trigger(),
+            [(cg.std_vector.template(cg.int32), "x")],
+            config[CONF_ON_RECEIVE],
         )
 
 
