@@ -13,8 +13,6 @@ from esphome.const import (
     CONF_FILTER,
     CONF_FREQUENCY,
     CONF_ID,
-    CONF_INPUT,
-    CONF_OUTPUT,
     CONF_TRIGGER_ID,
     CONF_UPDATE_INTERVAL,
     STATE_CLASS_MEASUREMENT,
@@ -73,9 +71,9 @@ CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(BL3361Component),
-            cv.Required(CONF_DATA_PIN): pins.gpio_pin_schema(
-                {CONF_INPUT: True, CONF_OUTPUT: True}, internal=True
-            ),
+            # Declared as an input; the component switches the pin to an output
+            # while it transmits, which the pin validation knows nothing about.
+            cv.Required(CONF_DATA_PIN): pins.internal_gpio_input_pin_schema,
             cv.Optional(CONF_FREQUENCY, default="433.92MHz"): validate_frequency,
             # Pulses shorter than this are noise of the receiver and get merged.
             cv.Optional(

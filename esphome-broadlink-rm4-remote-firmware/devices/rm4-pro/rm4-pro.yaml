@@ -31,8 +31,10 @@
 #   Status LED       led_pin 7       PA7
 #   Button           keypad 19       PA19
 #   RF data          rf data_pin 20  PA20   (used by rf.yaml)
-#   Network LED?     network pin 15  PA15   (shares the pad with the RX line of
-#                                            the flashing UART, left alone)
+#   Network pin      rmparam 15      PA15   (the stock firmware calls it
+#                                            app_network_pin; it is also the RX
+#                                            line of the flashing UART, so it is
+#                                            left alone)
 #
 # All pins were found in the profile, nothing was taken on trust. What no dump
 # can prove is the polarity of the LED and button; both follow the RM4 Mini,
